@@ -30,7 +30,13 @@ class Context(object):
     def __init__(self, context):
         # If the context string is not null and contains 4 or 5
         # colon-delimited fields
-        if context and len(context.split(":")) in (4, 5):
+        if context == "?":
+            self._fields = 4
+            self._user = "?"
+            self._role = "?"
+            self._type = "?"
+            self._sens = "?" 
+        elif context and len(context.split(":")) in (4, 5):
             # Split the context
             ctx = context.split(":")
             if len(ctx) == 4:
@@ -259,7 +265,7 @@ class Policy(object):
         for cls in self.policy.classes():
             try:
                 cmn = cls.common
-            except setools.policyrep.exception.NoCommon:
+            except setools.policyrep.NoCommon:
                 cmnset = cls.perms
             else:
                 cmnset = cls.perms.union(self.policy.lookup_common(cmn).perms)

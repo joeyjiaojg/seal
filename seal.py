@@ -134,7 +134,7 @@ def process_picker(args, proclist):
     # If we haven't matched the PID or exact name, match the partial name
     if candidate is None:
         for proc in list(proclist.values()):
-            if args.process in proc.name:
+            if args.process and args.process in proc.name:
                 candidate = proc
                 break
     return candidate

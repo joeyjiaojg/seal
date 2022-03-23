@@ -38,7 +38,7 @@ class Device(object):
         # Split by newline and remove first line ("List of devices attached")
         # TODO: surround with try/except?
         devices = subprocess.check_output(
-            [adb, "devices", "-l"]).split('\n')[1:]
+            [adb, "devices", "-l"]).decode('utf-8').split('\n')[1:]
         tmp = {}
         for dev in devices:
             if dev:
@@ -52,7 +52,7 @@ class Device(object):
         # Initially assume we are not root
         root_adb = "not_root"
         # Try running adb as root
-        root_status = subprocess.check_output(cmd + ["root"]).strip('\r\n')
+        root_status = subprocess.check_output(cmd + ["root"]).decode('utf-8').strip('\r\n')
         if (root_status == "adbd is already running as root" or
                 root_status == "restarting adbd as root"):
             # We have root
@@ -60,11 +60,11 @@ class Device(object):
         else:
             # Check wether 'su' exists
             root_status = subprocess.check_output(
-                cmd + ["shell", "command", "-v", "su"]).strip('\r\n')
+                cmd + ["shell", "command", "-v", "su"]).decode('utf-8').strip('\r\n')
             # If su exists, check if we can be root
             if root_status:
                 root_status = subprocess.check_output(
-                    cmd + ["shell", "su", "-c", "id"]).strip('\r\n')
+                    cmd + ["shell", "su", "-c", "id"]).decode('utf-8').strip('\r\n')
                 if "uid=0(root) gid=0(root)" in root_status:
                     # We have a root shell
                     root_adb = "root_shell"
@@ -160,7 +160,7 @@ class Device(object):
             # Get the Android version from the connected device
             cmd = ["getprop", "ro.build.version.release"]
             # TODO: surround with try/except?
-            tmp = subprocess.check_output(self.shell + cmd)
+            tmp = subprocess.check_output(self.shell + cmd).decode('utf-8')
             self._android_version = tmp.strip('\r\n')
         return self._android_version
 
@@ -171,7 +171,7 @@ class Device(object):
             # Get the SELinux mode from the connected device
             cmd = ["getenforce"]
             # TODO: surround with try/except?
-            tmp = subprocess.check_output(self.shell + cmd)
+            tmp = subprocess.check_output(self.shell + cmd).decode('utf-8')
             self._selinux_mode = tmp.strip('\r\n').lower()
         return self._selinux_mode
 
@@ -184,7 +184,7 @@ class Device(object):
         cmd = ["ps", "-Z"]
         # Split by newlines and remove first line ("LABEL USER PID PPID NAME")
         # TODO: surround with try/except?
-        psz = subprocess.check_output(self.shell + cmd).split('\n')[1:]
+        psz = subprocess.check_output(self.shell + cmd).decode('utf-8').split('\n')[1:]
         for line in psz:
             line = line.strip("\r")
             if line:
@@ -215,7 +215,7 @@ class Device(object):
         # all the entries, therefore on error convert output to a list as if
         # nothing happened.
         try:
-            listing = subprocess.check_output(self.shell + cmd).split('\n')
+            listing = subprocess.check_output(self.shell + cmd).decode('utf-8').split('\n')
         except subprocess.CalledProcessError as e:
             listing = e.output.split('\n')
 
@@ -267,7 +267,7 @@ class Device(object):
         Returns a dictionary (filename, File)."""
         path = os.path.normpath(path)
         cmd = ["ls", "-lZ", "'" + path + "'"]
-        listing = subprocess.check_output(self.shell + cmd).split('\n')
+        listing = subprocess.check_output(self.shell + cmd).decode('utf-8').split('\n')
         line = listing[0].strip("\r")
         # Parse ls -lZ output for a single file
         try:
@@ -289,7 +289,7 @@ class Device(object):
         Returns a dictionary (filename, File)."""
         path = os.path.normpath(path)
         cmd = ["ls", "-ldZ", "'" + path + "'"]
-        listing = subprocess.check_output(self.shell + cmd).split('\n')
+        listing = subprocess.check_output(self.shell + cmd).decode('utf-8').split('\n')
         line = listing[0].strip("\r")
         # Parse ls -ldZ output for a directory
         try:
@@ -337,7 +337,7 @@ class File(object):
         # TODO: change the parsing to matching groups in the regexes and
         # extract parameters that way.
         # If this is an old-style file line (Android<=6.0)
-        if a_v == "6.0" or (a_v[0].isdigit() and (int(a_v[0])) < 6):
+        if a_v == "6.0" or ('.' in a_v and int(a_v.split(".")[0]) < 6) or int(a_v) < 6:
             if not File.correct_line_6_0.match(l):
                 raise ValueError('Bad file "{}"'.format(l))
             line = l.split(None, 4)
@@ -361,8 +361,6 @@ class File(object):
             self._absname = os.path.join(self._path, self._basename)
         # If this is a new-style file line (Android>=6.0.1)
         elif a_v == "6.0.1" or File.SUPPORT_NEWER_VERSIONS:
-            if not File.correct_line_6_0_1.match(l):
-                raise ValueError('Bad file "{}"'.format(l))
             # If this is a character device or a block device, split the line
             # in 9 to work around the "size" being two space-separated fields
             #                                      vvvv
@@ -393,7 +391,13 @@ class File(object):
                 # If it is a symlink it has a target
                 self._basename, self._target = line[8].split(" -> ")
             else:
-                self._basename = line[8]
+                try:
+                    self._basename = line[8]
+                except:
+                    print(l)
+                    self._path = d
+                    self._absname = None
+                    return
             self._path = d
             self._absname = os.path.join(self._path, self._basename)
         else:
@@ -531,7 +535,7 @@ class Process(object):
         a_v     - the Android version string ("5.1.1", "6.0", "N", ...)
         """
         # If this is an old-style process line (Android<=6.0)
-        if a_v == "6.0" or (a_v[0].isdigit() and (int(a_v[0])) < 6):
+        if a_v == "6.0" or ('.' in a_v and int(a_v.split(".")[0]) < 6) or int(a_v) < 6:
             if not Process.correct_line_6_0.match(line):
                 raise ValueError('Bad process "{}"'.format(line))
             p = line.split(None, 4)
