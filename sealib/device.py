@@ -215,9 +215,13 @@ class Device(object):
         # all the entries, therefore on error convert output to a list as if
         # nothing happened.
         try:
-            listing = subprocess.check_output(self.shell + cmd).decode('utf-8').split('\n')
-        except subprocess.CalledProcessError as e:
-            listing = e.output.split('\n')
+            if os.getenv("FILE_CACHE"):
+                import json
+                listing = json.loads(os.getenv("FILE_CACHE"))
+            else:
+                listing = subprocess.check_output(self.shell + cmd).decode('utf-8').split('\n')
+        except Exception as e:
+            listing = e.output.decode('utf-8').split('\n')
 
         # Parse ls -lRZ output for a directory
         # In Android <=6.0 the output of ls -lRZ "<DIRECTORY>" begins
@@ -257,7 +261,8 @@ class Device(object):
                 self.log.error("In directory \"%s\"", directory)
                 self.log.error(e)
             else:
-                files_dict[f.absname] = f
+                if f:
+                    files_dict[f.absname] = f
         return files_dict
 
     def get_file(self, path):
@@ -337,6 +342,9 @@ class File(object):
         # TODO: change the parsing to matching groups in the regexes and
         # extract parameters that way.
         # If this is an old-style file line (Android<=6.0)
+        if '?' in l:
+            self._absname = '?'
+            return None
         if a_v == "6.0" or ('.' in a_v and int(a_v.split(".")[0]) < 6) or int(a_v) < 6:
             if not File.correct_line_6_0.match(l):
                 raise ValueError('Bad file "{}"'.format(l))
@@ -387,17 +395,15 @@ class File(object):
                 self._size = line[5]
             self._lastdate = line[6]
             self._lasttime = line[7]
-            if self._security_class == "lnk_file" and "->" in line[8]:
-                # If it is a symlink it has a target
-                self._basename, self._target = line[8].split(" -> ")
-            else:
-                try:
+            try:
+                if self._security_class == "lnk_file" and "->" in line[8]:
+                    # If it is a symlink it has a target
+                    self._basename, self._target = line[8].split(" -> ")
+                else:
                     self._basename = line[8]
-                except:
+            except:
                     print(l)
-                    self._path = d
-                    self._absname = None
-                    return
+                    return None
             self._path = d
             self._absname = os.path.join(self._path, self._basename)
         else:

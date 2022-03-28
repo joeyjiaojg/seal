@@ -197,7 +197,7 @@ def files(args):
 
     if not args.pid and not args.process:
         # Just list all the files
-        files_dict = device.get_files()
+        files_dict = device.get_files(args.path)
         print_files(args, None, files_dict, None)
     else:
         # Create the policy
@@ -219,7 +219,7 @@ def files(args):
         logging.info("The \"%s\" process with PID %s is running in the "
                      "\"%s\" context", process.name, process.pid,
                      process.context)
-        files_dict = device.get_files()
+        files_dict = device.get_files(args.path)
         file_permissions = get_process_permissions(p, process, files_dict)
         print_files(args, process, files_dict, file_permissions)
 
@@ -531,6 +531,8 @@ def main():
                         help="Path to your local root adb if not in your $PATH")
     parser.add_argument("-s", "--device", metavar="<DEVICE>",
                         help="Specify a device to work with")
+    parser.add_argument("-p", "--path",
+                        help="Specify a initial path to work with")
     subparsers = parser.add_subparsers(help='sub-command help')
     # Subparser for polinfo
     parser_polinfo = subparsers.add_parser('polinfo',
