@@ -238,7 +238,7 @@ def get_process_permissions(policy, process, files_dict):
                 if f.security_class == rule.tclass:
                     # We have some rule applicable to this file class
                     if fname in file_permissions:
-                        file_permissions[fname].update(rule.perms)
+                        set(file_permissions[fname]).update(rule.perms)
                     else:
                         file_permissions[fname] = rule.perms
     return file_permissions
@@ -531,7 +531,7 @@ def main():
                         help="Path to your local root adb if not in your $PATH")
     parser.add_argument("-s", "--device", metavar="<DEVICE>",
                         help="Specify a device to work with")
-    parser.add_argument("-p", "--path",
+    parser.add_argument("-p", "--path", default='/',
                         help="Specify a initial path to work with")
     subparsers = parser.add_subparsers(help='sub-command help')
     # Subparser for polinfo

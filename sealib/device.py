@@ -208,7 +208,9 @@ class Device(object):
 
         # Get the File object for the top-level path
         # We could not get it otherwise
-        files_dict.update(self.get_dir(path))
+        d = self.get_dir(path)
+        if d:
+            files_dict.update(d)
         # If the device is slow there can be errors produced when running down
         # /proc (ls: /proc/10/exe: No such file or directory) particularly on
         # the emulator. On exception this will just output a string containing
@@ -216,8 +218,14 @@ class Device(object):
         # nothing happened.
         try:
             if os.getenv("FILE_CACHE"):
-                import json
-                listing = json.loads(os.getenv("FILE_CACHE"))
+                lines = open(os.getenv("FILE_CACHE"), 'rb').readlines()
+                listing = []
+                for line in lines:
+                    try:
+                        listing.append(line.decode('utf-8').replace('\n', ''))
+                    except:
+                        self.log.warning("decode err: %s", line)
+                        pass
             else:
                 listing = subprocess.check_output(self.shell + cmd).decode('utf-8').split('\n')
         except Exception as e:
@@ -260,6 +268,7 @@ class Device(object):
                     return None
                 self.log.error("In directory \"%s\"", directory)
                 self.log.error(e)
+                continue
             else:
                 if f:
                     files_dict[f.absname] = f
@@ -303,7 +312,9 @@ class Device(object):
             self.log.error(e)
             return None
         else:
-            return {f.absname: f}
+            if f:
+                return {f.absname: f}
+            return None
 
 
 class File(object):
@@ -343,8 +354,9 @@ class File(object):
         # extract parameters that way.
         # If this is an old-style file line (Android<=6.0)
         if '?' in l:
-            self._absname = '?'
-            return None
+            raise ValueError('? in ' + l)
+        if 'No such file or directory' in l:
+            raise ValueError('No such file or directory')
         if a_v == "6.0" or ('.' in a_v and int(a_v.split(".")[0]) < 6) or int(a_v) < 6:
             if not File.correct_line_6_0.match(l):
                 raise ValueError('Bad file "{}"'.format(l))
@@ -377,7 +389,12 @@ class File(object):
                 line = l.split(None, 9)
             else:
                 line = l.split(None, 8)
-            self._security_class = File.file_class_converter[l[0]]
+            if len(line) not in [9, 10]:
+                raise ValueError("Not enough fields: " + l)
+            try:
+                self._security_class = File.file_class_converter[l[0]]
+            except:
+                raise ValueError("Wrong fields: " + l)
             self._dac = line[0]
             self._linkno = line[1]
             self._user = line[2]
